@@ -1,33 +1,51 @@
 import random
 from typing import Union
 
+# Look-up table for all variations of counts patterns
+count_rankings = {(5,): 10, (4, 1): 7, (3, 2): 6, (3, 1, 1): 3, (2, 2, 1): 2,
+                  (2, 1, 1, 1): 1, (1, 1, 1, 1, 1): 0}
+
 
 def poker(hands: list[list[str]]) -> list[str]:
     """Return the best hand: poker([hand,...]) => hand"""
-    return max(hands, key=hand_rank)
+    return allmax(hands, key=hand_rank)
+
+
+def allmax(iterable, key=None):
+    """Return a list of all items equal to the max of the iterable."""
+    result, max_val = [], None
+    key = key or (lambda x: x)
+    for x in iterable:
+        x_val = key(x)
+        if not result or x_val > max_val:
+            result, max_val = [x], x_val
+        elif x_val == max_val:
+            result.append(x)
+    return result
+
+
+def group(items):
+    """Return a list of [(count, x)...], the highest count first, then x first."""
+    groups = [(items.count(x), x) for x in set(items)]
+    return sorted(groups, reverse=True)
+
+
+def unzip(pairs):
+    """Convert a list of pairs into a par of lists"""
+    return zip(*pairs)
 
 
 def hand_rank(hand: list[str]) -> tuple:
-    """Return a value indicating the rank of a hand"""
-    ranks = card_ranks(hand)
-    if straight(ranks) and flush(hand):
-        return 8, max(ranks)
-    elif kind(4, ranks):
-        return 7, kind(4, ranks), kind(1, ranks)
-    elif kind(3, ranks) and kind(2, ranks):
-        return 6, kind(3, ranks), kind(2, ranks)
-    elif flush(hand):
-        return 5, ranks
-    elif straight(ranks):
-        return 4, max(ranks)
-    elif kind(3, ranks):
-        return 3, kind(3, ranks)
-    elif two_pair(ranks):
-        return 2, two_pair(ranks), kind(1, ranks)
-    elif kind(2, ranks):
-        return 1, kind(2, ranks), ranks
-    else:
-        return 0, ranks
+    """Return a value indicating how high the hand ranks."""
+    # E.g. '7 T 7 9 7' => counts = (3, 1, 1); ranks = (7, 10, 9)
+    groups = group(['--23456789TJQKA'.index(r) for r, s in hand])
+    counts, ranks = unzip(groups)
+    if ranks == (14, 5, 4, 3, 2):
+        ranks = (5, 4, 3, 2, 1)
+    straight = max(ranks) - min(ranks) == 4 and len(ranks) == 5
+    flush = len(set([s for r, s in hand])) == 1
+    # 4*straight converts bool into int implicitly
+    return max(count_rankings[counts], 4 * straight, 5 * flush), ranks
 
 
 def kind(n, ranks) -> Union[int, None]:
@@ -47,31 +65,11 @@ def two_pair(ranks) -> Union[tuple, None]:
     return None
 
 
-def card_ranks(hand):
-    """Return a list of the ranks, sorted with higher first."""
-    ranks = ['--23456789TJQKA'.index(r) for r, s in hand]
-    ranks.sort(reverse=True)
-    if ranks[0] == 14 and ranks[1] == 5:
-        n_ranks = ranks[1:]
-        n_ranks.append(1)
-        if straight(n_ranks):
-            return n_ranks
-    return ranks
-
-
-def straight(ranks):
-    """Return True if the ordered ranks form a 5-card straight."""
-    return (max(ranks) - min(ranks) == 4) and len(set(ranks)) == 5
-
-
-def flush(hand: list[str]) -> bool:
-    return len(set([s for r, s in hand])) == 1
-
-
 def deal(numhands: int, deck: list[str], n=5):
+    """Use random to shuffle the deck of cards and create hands with n cards in each."""
     random.shuffle(deck)
     if numhands * n > len(deck):
-        print("Not enough cards in deck")
+        print("Not enough cards in the deck.")
         return
     hands = []
     for i in range(numhands):
